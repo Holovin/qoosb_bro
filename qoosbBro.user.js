@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         QOOSb Highlight
 // @namespace    https://holov.in/
-// @version      0.0.3
+// @version      0.0.4
 // @description  Browser helper
 // @author       Alex Holovin
 // @match        https://www.google.com/search?q=*
@@ -63,9 +63,8 @@
                 continue;
             }
 
-            block.innerHTML = html.replace(answer,`<span style="${styleWord}">${answer}</span>`);
+            block.innerHTML = html.replace(answer, new RegExp(`<span style="${styleWord}">${answer}</span>`,'g'));
             block.innerHTML = `<div style="${styleBlock}">${block.innerHTML}</div>`;
-            return;
         }
     }
 
@@ -89,6 +88,7 @@
     const url = new URL(window.location.href);
     const answers = decodeURI(url.searchParams.get('x-answers')).toLowerCase().split('|||');
 
-    removeExtraGoogleBlocks();
+    // TODO: rework
+    // removeExtraGoogleBlocks();
     processBlock(document.body.children);
 })();
