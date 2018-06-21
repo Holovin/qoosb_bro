@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         QOOSb Highlight
 // @namespace    https://holov.in/
-// @version      0.0.4
+// @version      0.0.5
 // @description  Browser helper
 // @author       Alex Holovin
 // @match        https://www.google.com/search?q=*
@@ -50,30 +50,37 @@
 
     function tryHighlightGoogle(block) {
         const html = block.innerHTML.toLowerCase();
-        const styleWord = 'font-size: 16px;' +
-                      'color: #FFEB3B;' +
-                      'background: red;';
-
-        const styleBlock = 'border: 1px solid red;' +
-                           'border-radius: 8px;' +
-                           'padding: 8px';
 
         for (let answer of answers) {
-            if (!html.includes(answer)) {
+            let simplifiedAnswer = answer.replace(/(?![A-zА-я0-9\-+=:;., ])./g, '');
+
+            // NLP-mode
+            simplifiedAnswer = simplifiedAnswer.length > 5
+                ? simplifiedAnswer.slice(0, -2)
+                : simplifiedAnswer;
+
+            alert(simplifiedAnswer);
+
+            if (!html.includes(simplifiedAnswer) || !simplifiedAnswer) {
                 continue;
             }
 
-            block.innerHTML = html.replace(answer, new RegExp(`<span style="${styleWord}">${answer}</span>`,'g'));
-            block.innerHTML = `<div style="${styleBlock}">${block.innerHTML}</div>`;
+            block.innerHTML = html.replace(new RegExp(answer, 'g'), `<span class="qoosb-google-word qoosb-common-padding">${answer}</span>`);
+            block.innerHTML = `<div class="qoosb-google-block">${block.innerHTML}</div>`;
         }
     }
 
     function tryHighlightCommon(block) {
         if (multiIncludes(block.textContent.toLowerCase(), answers)) {
-            block.style.background = '#FFF176';
-            block.style.wordWrap = 'normal';
-            block.style.whiteSpace = 'initial';
+            block.className += ' qoosb-common-block qoosb-common-padding';
         }
+    }
+
+    function insertStyles(styles) {
+        const css = document.createElement('style');
+        css.type = 'text/css';
+        css.innerHTML = styles;
+        document.body.appendChild(css)
     }
 
     function removeExtraGoogleBlocks() {
@@ -85,10 +92,38 @@
         }
     }
 
+    const styles = `
+        .qoosb-common-padding {
+            display: inline-block;
+            padding: 3px;
+        }
+
+        .qoosb-common-block {
+            background: #FFF9C4;
+            wordWrap: normal;
+            whiteSpace: initial;
+        }
+
+        .qoosb-google-word {
+            font-size: 16px;
+            color: #FFEB3B;
+            background: #212121;
+        }
+
+        .qoosb-google-block {
+            border: 1px solid red;
+            border-radius: 8px;
+            padding: 8px;
+        }
+    `;
+
     const url = new URL(window.location.href);
-    const answers = decodeURI(url.searchParams.get('x-answers')).toLowerCase().split('|||');
+    const answers = decodeURI(url.searchParams.get('x-answers'))
+        .toLowerCase()
+        .split('|||');
 
     // TODO: rework
     // removeExtraGoogleBlocks();
+    insertStyles(styles);
     processBlock(document.body.children);
 })();
