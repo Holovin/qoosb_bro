@@ -1,14 +1,18 @@
 // ==UserScript==
 // @name         QOOSb Highlight
 // @namespace    https://holov.in/
-// @version      0.0.5
+// @version      0.0.6
 // @description  Browser helper
 // @author       Alex Holovin
 // @match        https://www.google.com/search?q=*
 // @grant        none
+// @require      https://rawgit.com/farzher/fuzzysort/master/fuzzysort.js
 // ==/UserScript==
 
-(function () {
+// copy lib
+const libFuzzy = fuzzysort;
+
+(function (libFuzzy) {
     'use strict';
 
     function multiIncludes(text, values) {
@@ -48,30 +52,44 @@
         }
     }
 
+    // TODO try back to innerHTML
     function tryHighlightGoogle(block) {
-        const html = block.innerHTML.toLowerCase();
+        const html = block.textContent;
+        const htmlArrayImmutableForSearch = html.split(' ').map(word => word.replace(/((?![0-9A-zА-я-]).)*/gm, ''));
+        const htmlArray = html.split(' ');
 
-        for (let answer of answers) {
-            let simplifiedAnswer = answer.replace(/(?![A-zА-я0-9\-+=:;., ])./g, '');
+        for (const answer of answersToFuzzy) {
+            const simplifiedAnswer = answer.replace(/(?![A-zА-я0-9\-+=:;., ])./g, '');
 
-            // NLP-mode
-            simplifiedAnswer = simplifiedAnswer.length > 5
-                ? simplifiedAnswer.slice(0, -2)
-                : simplifiedAnswer;
+            let lastIndex = 0;
+            let results = libFuzzy.go(simplifiedAnswer, htmlArrayImmutableForSearch, { threshold: -10000 });
 
-            alert(simplifiedAnswer);
+            results.map(result => {
+                if (result.target.length > 1) {
+                    lastIndex = htmlArrayImmutableForSearch.indexOf(result.target, lastIndex);
 
-            if (!html.includes(simplifiedAnswer) || !simplifiedAnswer) {
-                continue;
+                    if (lastIndex !== -1) {
+                        htmlArray[lastIndex] = `<span class="qoosb-google-word qoosb-common-padding">${htmlArray[lastIndex]}</span>`;
+                    } else {
+                        console.warn('Try find, but something wrong!');
+                    }
+
+                    lastIndex = 0;
+                }
+
+            });
+
+            console.warn('RESULTS', results);
+
+            if (results.total > 0) {
+                // highlight whole block
+                block.innerHTML = `<div class="qoosb-google-block">${htmlArray.join(' ')}</div>`;
             }
-
-            block.innerHTML = html.replace(new RegExp(answer, 'g'), `<span class="qoosb-google-word qoosb-common-padding">${answer}</span>`);
-            block.innerHTML = `<div class="qoosb-google-block">${block.innerHTML}</div>`;
         }
     }
 
     function tryHighlightCommon(block) {
-        if (multiIncludes(block.textContent.toLowerCase(), answers)) {
+        if (multiIncludes(block.textContent.toLowerCase(), answersCommon)) {
             block.className += ' qoosb-common-block qoosb-common-padding';
         }
     }
@@ -81,15 +99,6 @@
         css.type = 'text/css';
         css.innerHTML = styles;
         document.body.appendChild(css)
-    }
-
-    function removeExtraGoogleBlocks() {
-        // remove extra search
-        const extraElements = document.getElementsByClassName('xpdopen');
-
-        for (const item of extraElements) {
-            item.remove();
-        }
     }
 
     const styles = `
@@ -118,12 +127,20 @@
     `;
 
     const url = new URL(window.location.href);
-    const answers = decodeURI(url.searchParams.get('x-answers'))
-        .toLowerCase()
-        .split('|||');
+    const answers = decodeURI(url.searchParams.get('x-answers')).toLowerCase();
 
-    // TODO: rework
-    // removeExtraGoogleBlocks();
+    const answersCommon = answers.split('|||');
+    const answersToFuzzy = answers
+        .split(/(\|{3})|( )/gm)
+        .filter(str =>
+            !!str &&
+            !!str.replace(' ', '') &&
+            str !== '|||' &&
+            str.length > 1);
+
+    console.log('ANSWERS: ', answersCommon, answersToFuzzy);
+
     insertStyles(styles);
     processBlock(document.body.children);
-})();
+
+})(libFuzzy);
