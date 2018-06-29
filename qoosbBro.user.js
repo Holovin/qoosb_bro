@@ -54,27 +54,31 @@ const libFuzzy = fuzzysort;
 
     // TODO try back to innerHTML
     function tryHighlightGoogle(block) {
-        const html = block.textContent;
-        const htmlArrayImmutableForSearch = html.split(' ').map(word => word.replace(/((?![0-9A-zА-я-]).)*/gm, ''));
-        const htmlArray = html.split(' ');
+        const html = block.textContent.split(' ');
+        const htmlForSearch = html.map(word => word.replace(/((?![0-9A-zА-я-]).)*/gm, ''));
 
         for (const answer of answersToFuzzy) {
-            const simplifiedAnswer = answer.replace(/(?![A-zА-я0-9\-+=:;., ])./g, '');
+            let simplifiedAnswer = answer.replace(/(?![A-zА-я0-9\-+=:;., ])./g, '');
+
+            // NLP again:
+            // ABC...DEF => ABC...D
+            if (simplifiedAnswer.length > 5) {
+                simplifiedAnswer = simplifiedAnswer.slice(0, -2);
+            }
 
             let lastIndex = 0;
-            let results = libFuzzy.go(simplifiedAnswer, htmlArrayImmutableForSearch, { threshold: -10000 });
+            let results = libFuzzy.go(simplifiedAnswer, htmlForSearch, { threshold: -10000 });
 
             results.map(result => {
                 if (result.target.length > 1) {
-                    lastIndex = htmlArrayImmutableForSearch.indexOf(result.target, lastIndex);
+                    lastIndex = htmlForSearch.indexOf(result.target, lastIndex);
 
                     if (lastIndex !== -1) {
-                        htmlArray[lastIndex] = `<span class="qoosb-google-word qoosb-common-padding">${htmlArray[lastIndex]}</span>`;
+                        html[lastIndex] = `<span class="qoosb-google-word qoosb-common-padding">${html[lastIndex]}</span>`;
                     } else {
                         console.warn('Try find, but something wrong!');
+                        lastIndex  = 0;
                     }
-
-                    lastIndex = 0;
                 }
 
             });
@@ -83,7 +87,7 @@ const libFuzzy = fuzzysort;
 
             if (results.total > 0) {
                 // highlight whole block
-                block.innerHTML = `<div class="qoosb-google-block">${htmlArray.join(' ')}</div>`;
+                block.innerHTML = `<div class="qoosb-google-block">${html.join(' ')}</div>`;
             }
         }
     }
